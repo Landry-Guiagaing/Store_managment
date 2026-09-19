@@ -1,0 +1,10 @@
+target/
+.git/
+.gitignore
+*.md
+.idea/
+.vscode/
+*.iml
+seed.sql
+styles.css
+description.md

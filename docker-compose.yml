@@ -1,0 +1,75 @@
+services:
+  # ============================================================
+  # BASE DE DONNÉES MySQL
+  # ============================================================
+  mysql:
+    image: mysql:8.0
+    container_name: estoque-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: estoque
+      MYSQL_USER: estoque_user
+      MYSQL_PASSWORD: estoque_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - estoque_mysql_data:/var/lib/mysql
+      - ./estoque/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - estoque-network
+
+  # ============================================================
+  # BACKEND Spring Boot
+  # ============================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: estoque-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/estoque?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: estoque_user
+      SPRING_DATASOURCE_PASSWORD: estoque_pass
+      JWT_SECRET: MaCleSecreteUltraLonguePourJwtDoitFaireAuMoins32Caracteres!
+      JWT_EXPIRATION: 86400000
+    ports:
+      - "8080:8080"
+    networks:
+      - estoque-network
+
+  # ============================================================
+  # FRONTEND Next.js
+  # ============================================================
+  frontend:
+    build:
+      context: ./frontend_next
+      dockerfile: Dockerfile
+      args:
+        # URL appelée par le NAVIGATEUR (pas par le conteneur)
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    container_name: estoque-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    networks:
+      - estoque-network
+
+volumes:
+  estoque_mysql_data:
+
+networks:
+  estoque-network:
+    driver: bridge
